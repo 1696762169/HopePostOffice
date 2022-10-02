@@ -25,13 +25,12 @@ public class ItemData
 
     public int LastRound { get; private set; }      // 道具持续回合数
     public int Number { get; private set; }         // 道具的数量
-    public string SpritePath { get; private set; }  // Sprite在Resources的路径
 
     // 装有此道具的装备者
     private EmployeeData employee = null;
 
     // 构造函数
-    public ItemData(int id, string name, int speed, int[] attr, float speedScale, float[] attrScale, int lastRound, string spritePath)
+    public ItemData(int id, string name, int speed, int[] attr, float speedScale, float[] attrScale, int lastRound)
     {
         // 检查传入数据是否有误
         if (attr == null || attr.Length != EmployeeData.attrNum ||
@@ -45,7 +44,6 @@ public class ItemData
         SpeedScale = speedScale;
         LastRound = lastRound;
         Number = 0;
-        SpritePath = spritePath;
 
         Attr = new int[EmployeeData.attrNum];
         AttrScale = new float[EmployeeData.attrNum];
@@ -56,7 +54,7 @@ public class ItemData
         }
 
     }
-    public ItemData(ItemData item) : this(item.Id, item.Name, item.Speed, item.Attr, item.SpeedScale, item.AttrScale, item.LastRound, item.SpritePath) { }
+    public ItemData(ItemData item) : this(item.Id, item.Name, item.Speed, item.Attr, item.SpeedScale, item.AttrScale, item.LastRound) { }
 
     // 为一个员工使用一个此道具
     public void UseTo(EmployeeData employee)

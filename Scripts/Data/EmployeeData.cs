@@ -8,37 +8,39 @@ public class EmployeeData
     public int Id { get; private set; }
     public string Name { get; private set; }
 
-    // 对外展示的只读属性
+    // 对外展示的只读属性数值
     public int Speed => CalcRealSpeed();
     public int Courage => CalcRealAttr(0);
     public int Wisdom => CalcRealAttr(1);
     public int Kindness => CalcRealAttr(2);
+    // 只读属性等级
+    public int SpeedLevel { get; private set; }
+    public int CourageLevel => attrLevel[0];
+    public int WisdomLevel => attrLevel[1];
+    public int KindnessLevel => attrLevel[2];
+
     // 道具数量
     public int ItemCount => itemList.Count;
     // 招募此人的价格
     public int Price { get; private set; }
-    // Sprite在Resources的路径
-    public string SpritePath { get; private set; }
 
-    // 基础属性
+    // 基础等级
     public const int attrNum = 3;
-    private int basicSpeed;
-    private int[] basicAttr = new int[attrNum];
+    private int[] attrLevel = new int[attrNum];
 
     // 长期道具列表
     private List<ItemData> itemList = new List<ItemData>();
 
     // 构造函数
-    public EmployeeData(int id, string name, int speed, int courage, int wisdom, int kindness, int price, string spritePath)
+    public EmployeeData(int id, string name, int speed, int courage, int wisdom, int kindness, int price)
     {
         Id = id;
         Name = name;
-        basicSpeed = speed;
-        basicAttr[0] = courage;
-        basicAttr[1] = wisdom;
-        basicAttr[2] = kindness;
+        SpeedLevel = speed;
+        attrLevel[0] = courage;
+        attrLevel[1] = wisdom;
+        attrLevel[2] = kindness;
         Price = price;
-        SpritePath = spritePath;
     }
 
     // 添加与减少道具
@@ -68,21 +70,16 @@ public class EmployeeData
         return false;
     }
 
-    /* 将速度/属性基础值乘以scale 然后增加num 传入负数就是减少 */
-    public void UpdateSpeed(int num, float scale = 1) => UpdateValue(ref basicSpeed, num, scale);
-    public void UpdateCourage(int num, float scale = 1) => UpdateValue(ref basicAttr[0], num, scale);
-    public void UpdateWisdom(int num, float scale = 1) => UpdateValue(ref basicAttr[1], num, scale);
-    public void UpdateKindness(int num, float scale = 1) => UpdateValue(ref basicAttr[2], num, scale);
-    private void UpdateValue(ref int origin, int num, float scale)
-    {
-        origin = (int)(origin * scale);
-        origin += num;
-    }
+    /* 更新速度/属性值等级 */
+    public void AddSpeed(int num) => SpeedLevel += num;
+    public void AddCourage(int num) => attrLevel[0] += num;
+    public void AddWisdom(int num) => attrLevel[1] += num;
+    public void AddKindness(int num) => attrLevel[2] += num;
 
     // 获取实际速度 逻辑暂时和属性相同
     private int CalcRealSpeed()
     {
-        int speed = basicSpeed;
+        int speed = SpeedLevelToValue();
         // 先进行比例运算 将改变的比例线性相加
         float scale = 1;
         foreach (ItemData equip in itemList)
@@ -95,6 +92,11 @@ public class EmployeeData
 
         return speed;
     }
+    // 根据速度等级得到基础速度值的转换公式
+    private int SpeedLevelToValue()
+    {
+        return SpeedLevel;
+    }
 
     /// <summary>
     /// 获取实际属性值 逻辑暂定
@@ -102,7 +104,7 @@ public class EmployeeData
     /// <param name="index">属性值编号</param>
     private int CalcRealAttr(int index)
     {
-        int attr = basicAttr[index];
+        int attr = AttrLevelToValue(index);
         // 先进行比例运算 将改变的比例线性相加
         float scale = 1;
         foreach (ItemData equip in itemList)
@@ -114,5 +116,13 @@ public class EmployeeData
             attr += equip.Attr[index];
 
         return attr;
+    }
+    /// <summary>
+    /// 根据属性值等级得到基础属性值的转换公式
+    /// </summary>
+    /// <param name="index">属性值编号</param>
+    private int AttrLevelToValue(int index)
+    {
+        return attrLevel[index];
     }
 }

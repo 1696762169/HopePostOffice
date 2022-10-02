@@ -1,6 +1,9 @@
+//#define DEBUG_ITEMMGR
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
+using MiniExcelLibs;
 
 public class ItemMgr
 {
@@ -8,7 +11,23 @@ public class ItemMgr
     public static ItemMgr Instance => instance;
     private ItemMgr()
     {
-
+        string filePath = Application.streamingAssetsPath + "/Items.xlsx";
+        foreach (var item in MiniExcel.Query<ItemDataRaw>(filePath, startCell: "A3").ToList())
+            items.Add(item.ID, item);
+#if DEBUG_ITEMMGR
+        ItemDataRaw data = items[1];
+        Debug.Log(data.ID);
+        Debug.Log(data.Name);
+        Debug.Log(data.Speed);
+        Debug.Log(data.Courage);
+        Debug.Log(data.Wisdom);
+        Debug.Log(data.Kindness);
+        Debug.Log(data.SpeedScale);
+        Debug.Log(data.CourageScale);
+        Debug.Log(data.WisdomScale);
+        Debug.Log(data.Kindness);
+        Debug.Log(data.LastRound);
+#endif
     }
 
     // 提供物品总数量 方便检查错误
@@ -34,31 +53,31 @@ public class ItemMgr
     // 存储需要配置的信息
     private class ItemDataRaw
     {
-        public string name;
+        public int ID { get; set; }
+        public string Name { get; set; }
 
-        public int speed;
-        public int courage;
-        public int wisdom;
-        public int kindness;
+        public int Speed { get; set; }
+        public int Courage { get; set; }
+        public int Wisdom { get; set; }
+        public int Kindness { get; set; }
 
-        public float speedScale;
-        public float courageScale;
-        public float wisdomScale;
-        public float kindnessScale;
+        public float SpeedScale { get; set; }
+        public float CourageScale { get; set; }
+        public float WisdomScale { get; set; }
+        public float KindnessScale { get; set; }
 
-        public int lastRound;
-        public string spritePath;
+        public int LastRound { get; set; }
     }
     private ItemData CreateItemData(int id, ItemDataRaw raw)
     {
         int[] attr = new int[EmployeeData.attrNum];
-        attr[0] = raw.courage;
-        attr[1] = raw.wisdom;
-        attr[2] = raw.kindness;
+        attr[0] = raw.Courage;
+        attr[1] = raw.Wisdom;
+        attr[2] = raw.Kindness;
         float[] attrScale = new float[EmployeeData.attrNum];
-        attrScale[0] = raw.courageScale;
-        attrScale[1] = raw.wisdomScale;
-        attrScale[2] = raw.kindnessScale;
-        return new ItemData(id, raw.name, raw.speed, attr, raw.speedScale, attrScale, raw.lastRound, raw.spritePath);
+        attrScale[0] = raw.CourageScale;
+        attrScale[1] = raw.WisdomScale;
+        attrScale[2] = raw.KindnessScale;
+        return new ItemData(id, raw.Name, raw.Speed, attr, raw.SpeedScale, attrScale, raw.LastRound);
     }
 }

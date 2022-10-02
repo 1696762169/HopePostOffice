@@ -1,6 +1,10 @@
+#define DEBUG_EMPLOYEEMGR
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
+using MiniExcelLibs;
+using System.Linq;
 
 public class EmployeeMgr
 {
@@ -8,7 +12,19 @@ public class EmployeeMgr
     public static EmployeeMgr Instance => instance;
     private EmployeeMgr()
     {
-        // 读入数据
+        string filePath = Application.streamingAssetsPath + "/Employees.xlsx";
+        foreach (var employee in MiniExcel.Query<EmpDataRaw>(filePath, startCell: "A3").ToList())
+            employees.Add(employee.ID, employee);
+#if DEBUG_EMPLOYEEMGR
+        EmpDataRaw data = employees[1];
+        Debug.Log(data.ID);
+        Debug.Log(data.Name);
+        Debug.Log(data.Speed);
+        Debug.Log(data.Courage);
+        Debug.Log(data.Wisdom);
+        Debug.Log(data.Kindness);
+        Debug.Log(data.Price);
+#endif
     }
 
     // 提供员工总数量 方便检查错误
@@ -34,16 +50,16 @@ public class EmployeeMgr
     // 存储需要配置的信息
     private class EmpDataRaw
     {
-        public string name;
-        public int speed;
-        public int courage;
-        public int wisdom;
-        public int kindness;
-        public int price;
-        public string spritePath;
+        public int ID { get; set; }
+        public string Name { get; set; }
+        public int Speed { get; set; }
+        public int Courage { get; set; }
+        public int Wisdom { get; set; }
+        public int Kindness { get; set; }
+        public int Price { get; set; }
     }
     private EmployeeData CreateEmployeeData(int id, EmpDataRaw raw)
     {
-        return new EmployeeData(id, raw.name, raw.speed, raw.courage, raw.wisdom, raw.kindness, raw.price, raw.spritePath);
+        return new EmployeeData(id, raw.Name, raw.Speed, raw.Courage, raw.Wisdom, raw.Kindness, raw.Price);
     }
 }
