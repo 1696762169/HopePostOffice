@@ -30,6 +30,7 @@ public class ItemData
     private EmployeeData employee = null;
 
     // 构造函数
+    public ItemData() : this(int.MaxValue, null, 0, new int[EmployeeData.attrNum], 0, new float[EmployeeData.attrNum], 0) { }
     public ItemData(int id, string name, int speed, int[] attr, float speedScale, float[] attrScale, int lastRound)
     {
         // 检查传入数据是否有误

@@ -6,7 +6,8 @@ public class Test : MonoBehaviour
 {
     void Start()
     {
-        EmployeeMgr.Instance.ToString();
+        //EmployeeMgr.Instance.ToString();
         //ItemMgr.Instance.ToString();
+        GlobalBuff.Instance.ToString();
     }
 }

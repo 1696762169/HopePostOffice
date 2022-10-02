@@ -84,11 +84,13 @@ public class EmployeeData
         float scale = 1;
         foreach (ItemData equip in itemList)
             scale += equip.SpeedScale - 1;
+        scale += GlobalBuff.Instance.SpeedScale;
         speed = (int)(speed * scale);
 
         // 再增加绝对值
         foreach (ItemData equip in itemList)
             speed += equip.Speed;
+        speed += GlobalBuff.Instance.Speed;
 
         return speed;
     }
@@ -109,11 +111,13 @@ public class EmployeeData
         float scale = 1;
         foreach (ItemData equip in itemList)
             scale += equip.AttrScale[index] - 1;
+        scale += GlobalBuff.Instance.AttrScale[index];
         attr = (int)(attr * scale);
 
         // 再增加绝对值
         foreach (ItemData equip in itemList)
             attr += equip.Attr[index];
+        attr += GlobalBuff.Instance.Attr[index];
 
         return attr;
     }
