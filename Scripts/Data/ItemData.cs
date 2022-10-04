@@ -76,7 +76,7 @@ public class ItemData
         {
             this.employee = employee;
             employee.AddItem(Id);
-            TimeMgr.Instance.roundEndAction += this.WearDown;
+            TimeMgr.Instance.RemoveRoundEvent(this.WearDown);
         }
     }
 
@@ -93,8 +93,9 @@ public class ItemData
         {
             employee.RemoveItem(Id);
             employee = null;
-            TimeMgr.Instance.roundEndAction -= this.WearDown;
+            TimeMgr.Instance.RemoveRoundEvent(this.WearDown);
         }
+        TimeMgr.Instance.RoundEventDone();
     }
 
     // 重写比较逻辑 用于在列表中删除
