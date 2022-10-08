@@ -1,26 +1,32 @@
+#define DEBUG_WAREHOUSE
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
+[System.Serializable]
 public class Warehouse
 {
     private static Warehouse instance = new Warehouse();
     public static Warehouse Instance => instance;
-    private Warehouse() { }
+    protected const string warehousePath = "Warehouse.json";
 
     // 钱和属性值
-    public int money;
-    public int courage;
-    public int wisdom;
-    public int kindness;
+    public int money = 0;
+    public int courage = 0;
+    public int wisdom = 0;
+    public int kindness = 0;
 
     // 查看列表的元素个数 方便遍历
     public int EmployeeCount => employees.Count;
     public int ItemCount => items.Count;
     public int TotalItemCount => totalItems.Count;
 
+    [SerializeField]
     private List<EmployeeData> employees = new List<EmployeeData>();    // 已招募员工列表
+    [SerializeField]
     private List<ItemData> items = new List<ItemData>();                // 当天使用的物品
+    [SerializeField]
     private List<ItemData> totalItems = new List<ItemData>();           // 玩家拥有的所有物品
 
     // 由游戏管理器进行初始化 防止在TimeMgr对象生成前初始化导致的错误
@@ -30,6 +36,9 @@ public class Warehouse
         if (inited)
             return;
         inited = true;
+
+        // 加载数据
+        LoadOrInitData();
 
         // 一天结束时清空当天要用的物品
         TimeMgr.Instance.dayEndAction += () =>
@@ -145,6 +154,7 @@ public class Warehouse
             return false;
 
         items[itemIndex].UseTo(employees[empIndex]);
+        RemoveEmptyItem();
         return true;
     }
     // 使用物品 参数是物品/员工在列表中的位置
@@ -161,10 +171,10 @@ public class Warehouse
     /// 移除已经用完的物品
     /// </summary>
     /// <returns>移除的物品数</returns>
-    public int RemoveEmptyItem()
+    protected int RemoveEmptyItem()
     {
         int removeCount = 0;
-        for (int i = TotalItemCount; i > 0; i++)
+        for (int i = TotalItemCount - 1; i >= 0; i++)
         {
             if (totalItems[i] == null || totalItems[i].Number <= 0)
             {
@@ -172,11 +182,39 @@ public class Warehouse
                 removeCount++;
             }
         }
-        for (int i = ItemCount; i > 0; i++)
+        for (int i = ItemCount - 1; i >= 0; i++)
         {
             if (items[i] == null || items[i].Number <= 0)
                 items.RemoveAt(i);
         }
         return removeCount;
+    }
+
+    /// <summary>
+    /// 将当前仓库数据写入文件
+    /// </summary>
+    public void SaveData()
+    {
+        string path = Application.persistentDataPath + "/" + warehousePath;
+        File.WriteAllText(path, JsonUtility.ToJson(instance, true));
+    }
+
+    // 从文件中读取数据 若找不到文件则使用初始化数据
+    protected void LoadOrInitData()
+    {
+        string path = Application.persistentDataPath + "/" + warehousePath;
+        if (File.Exists(path))
+            instance = JsonUtility.FromJson<Warehouse>(File.ReadAllText(path));
+        else
+            InitData();
+    }
+    // 初始化数据并存入文件
+    protected void InitData()
+    {
+#if DEBUG_WAREHOUSE
+        employees.Add(EmployeeMgr.Instance.GetEmployee(1));
+        totalItems.Add(ItemMgr.Instance.GetItem(1));
+#endif
+        SaveData();
     }
 }

@@ -9,5 +9,6 @@ public class Test : MonoBehaviour
         //EmployeeMgr.Instance.ToString();
         //ItemMgr.Instance.ToString();
         GlobalBuff.Instance.ToString();
+        Warehouse.Instance.Init();
     }
 }

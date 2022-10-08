@@ -1,4 +1,4 @@
-#define DEBUG_EMPLOYEEMGR
+//#define DEBUG_EMPLOYEEMGR
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;

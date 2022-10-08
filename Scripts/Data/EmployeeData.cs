@@ -2,11 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
 public class EmployeeData
 {
     // 名称与ID ID是员工的唯一标识符
-    public int Id { get; private set; }
-    public string Name { get; private set; }
+    public int Id => id;
+    [SerializeField]
+    private int id;
+    public string Name => name;
+    [SerializeField]
+    private string name;
 
     // 对外展示的只读属性数值
     public int Speed => CalcRealSpeed();
@@ -14,7 +19,9 @@ public class EmployeeData
     public int Wisdom => CalcRealAttr(1);
     public int Kindness => CalcRealAttr(2);
     // 只读属性等级
-    public int SpeedLevel { get; private set; }
+    public int SpeedLevel => speedLevel;
+    [SerializeField]
+    private int speedLevel;
     public int CourageLevel => attrLevel[0];
     public int WisdomLevel => attrLevel[1];
     public int KindnessLevel => attrLevel[2];
@@ -22,25 +29,29 @@ public class EmployeeData
     // 道具数量
     public int ItemCount => itemList.Count;
     // 招募此人的价格
-    public int Price { get; private set; }
+    public int Price => price;
+    [SerializeField]
+    private int price;
 
     // 基础等级
     public const int attrNum = 3;
+    [SerializeField]
     private int[] attrLevel = new int[attrNum];
 
     // 长期道具列表
+    [SerializeField]
     private List<ItemData> itemList = new List<ItemData>();
 
     // 构造函数
     public EmployeeData(int id, string name, int speed, int courage, int wisdom, int kindness, int price)
     {
-        Id = id;
-        Name = name;
-        SpeedLevel = speed;
+        this.id = id;
+        this.name = name;
+        speedLevel = speed;
         attrLevel[0] = courage;
         attrLevel[1] = wisdom;
         attrLevel[2] = kindness;
-        Price = price;
+        this.price = price;
     }
 
     // 添加与减少道具
@@ -71,7 +82,7 @@ public class EmployeeData
     }
 
     /* 更新速度/属性值等级 */
-    public void AddSpeed(int num) => SpeedLevel += num;
+    public void AddSpeed(int num) => speedLevel += num;
     public void AddCourage(int num) => attrLevel[0] += num;
     public void AddWisdom(int num) => attrLevel[1] += num;
     public void AddKindness(int num) => attrLevel[2] += num;
