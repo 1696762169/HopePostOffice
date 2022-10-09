@@ -120,7 +120,7 @@ public class Warehouse
         if (item != null)
         {
             item.AddNumber(num);
-            items.Add(item);
+            totalItems.Add(item);
         }
         return item != null;
     }
