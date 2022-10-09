@@ -55,12 +55,12 @@ public class EmployeeData
     }
 
     // 添加与减少道具
-    public bool AddItem(int id)
+    public ItemData AddItem(int id)
     {
         ItemData item = ItemMgr.Instance.GetItem(id);
         if (item != null)
             itemList.Add(item);
-        return item != null;
+        return item;
     }
     public ItemData GetItem(int index)
     {
@@ -94,13 +94,15 @@ public class EmployeeData
         // 先进行比例运算 将改变的比例线性相加
         float scale = 1;
         foreach (ItemData equip in itemList)
-            scale += equip.SpeedScale - 1;
+            if (equip.LastRound > 0)
+                scale += equip.SpeedScale - 1;
         scale += GlobalBuff.Instance.SpeedScale;
         speed = (int)(speed * scale);
 
         // 再增加绝对值
         foreach (ItemData equip in itemList)
-            speed += equip.Speed;
+            if (equip.LastRound > 0)
+                speed += equip.Speed;
         speed += GlobalBuff.Instance.Speed;
 
         return speed;
@@ -121,13 +123,15 @@ public class EmployeeData
         // 先进行比例运算 将改变的比例线性相加
         float scale = 1;
         foreach (ItemData equip in itemList)
-            scale += equip.AttrScale[index] - 1;
+            if (equip.LastRound > 0)
+                scale += equip.AttrScale[index] - 1;
         scale += GlobalBuff.Instance.AttrScale[index];
         attr = (int)(attr * scale);
 
         // 再增加绝对值
         foreach (ItemData equip in itemList)
-            attr += equip.Attr[index];
+            if (equip.LastRound > 0)
+                attr += equip.Attr[index];
         attr += GlobalBuff.Instance.Attr[index];
 
         return attr;

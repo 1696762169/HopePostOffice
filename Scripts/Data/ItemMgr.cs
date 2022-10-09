@@ -1,4 +1,4 @@
-//#define DEBUG_ITEMMGR
+#define DEBUG_ITEMMGR
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -26,6 +26,7 @@ public class ItemMgr
         Debug.Log(data.CourageScale);
         Debug.Log(data.WisdomScale);
         Debug.Log(data.Kindness);
+        Debug.Log(data.Price);
         Debug.Log(data.LastRound);
 #endif
     }
@@ -66,6 +67,7 @@ public class ItemMgr
         public float WisdomScale { get; set; }
         public float KindnessScale { get; set; }
 
+        public int Price { get; set; }
         public int LastRound { get; set; }
     }
     private ItemData CreateItemData(int id, ItemDataRaw raw)
@@ -78,6 +80,6 @@ public class ItemMgr
         attrScale[0] = raw.CourageScale;
         attrScale[1] = raw.WisdomScale;
         attrScale[2] = raw.KindnessScale;
-        return new ItemData(id, raw.Name, raw.Speed, attr, raw.SpeedScale, attrScale, raw.LastRound);
+        return new ItemData(id, raw.Name, raw.Speed, attr, raw.SpeedScale, attrScale, raw.Price ,raw.LastRound);
     }
 }

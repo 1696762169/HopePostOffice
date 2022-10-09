@@ -1,4 +1,4 @@
-#define DEBUG_ITEM
+//#define DEBUG_ITEM
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -36,6 +36,10 @@ public class ItemData
     [SerializeField]
     private float[] attrScale;
 
+    public int Price => price;              // 道具购买价格
+    [SerializeField]
+    private int price;
+
     public int LastRound => lastRound;     // 道具持续回合数
     [SerializeField]
     private int lastRound;
@@ -43,12 +47,9 @@ public class ItemData
     [SerializeField]
     private int number;
 
-    // 装有此道具的装备者
-    private EmployeeData employee = null;
-
     // 构造函数
-    public ItemData() : this(int.MaxValue, null, 0, new int[EmployeeData.attrNum], 0, new float[EmployeeData.attrNum], 0) { }
-    public ItemData(int id, string name, int speed, int[] attr, float speedScale, float[] attrScale, int lastRound)
+    public ItemData() : this(int.MaxValue, null, 0, new int[EmployeeData.attrNum], 0, new float[EmployeeData.attrNum], 0, 0) { }
+    public ItemData(int id, string name, int speed, int[] attr, float speedScale, float[] attrScale, int price, int lastRound)
     {
         // 检查传入数据是否有误
         if (attr == null || attr.Length != EmployeeData.attrNum ||
@@ -61,6 +62,7 @@ public class ItemData
         this.speed = speed;
         this.speedScale = speedScale;
         this.lastRound = lastRound;
+        this.price = price;
         this.number = 0;
 
         this.attr = new int[EmployeeData.attrNum];
@@ -72,7 +74,7 @@ public class ItemData
         }
 
     }
-    public ItemData(ItemData item) : this(item.Id, item.Name, item.Speed, item.Attr, item.SpeedScale, item.AttrScale, item.LastRound) { }
+    public ItemData(ItemData item) : this(item.Id, item.Name, item.Speed, item.Attr, item.SpeedScale, item.AttrScale, item.price, item.LastRound) { }
 
     // 为一个员工使用一个此道具
     public void UseTo(EmployeeData employee)
@@ -91,7 +93,6 @@ public class ItemData
         // 长期物品需添加损毁检测
         if (LastRound > 0)
         {
-            this.employee = employee;
             employee.AddItem(Id);
             TimeMgr.Instance.roundEndAction += this.WearDown;
         }
@@ -108,8 +109,6 @@ public class ItemData
         // 移除自身
         if (LastRound == 0)
         {
-            employee.RemoveItem(Id);
-            employee = null;
             TimeMgr.Instance.roundEndAction -= this.WearDown;
         }
     }
