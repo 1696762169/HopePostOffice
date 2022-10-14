@@ -9,6 +9,7 @@ public class Warehouse
 {
     private static Warehouse instance = new Warehouse();
     public static Warehouse Instance => instance;
+    private Warehouse() => Init();
     protected const string warehousePath = "Warehouse.json";
 
     // 钱和属性值
@@ -88,6 +89,19 @@ public class Warehouse
             if (totalItems[i].Id == id)
             {
                 items.Add(totalItems[i]);
+                return true;
+            }
+        }
+        return false;
+    }
+    // 删除今天要用的物品
+    public bool RemoveItem(int id)
+    {
+        for(int i = 0; i < ItemCount; ++i)
+        {
+            if (items[i].Id == id)
+            {
+                items.RemoveAt(i);
                 return true;
             }
         }
