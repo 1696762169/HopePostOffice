@@ -41,7 +41,8 @@ public class TaskData
 
     // 任务完成触发事件
     public UnityEvent FinishTask;
-
+    // 剩余前置任务数量
+    public int Prev;
 
     public TaskData() { }
     public TaskData(TaskMgr.TaskDataRaw raw, Dictionary<int, MiddlePlace> mps)
@@ -97,6 +98,8 @@ public class TaskData
     // 添加中间地点
     protected void AddMiddlePlaces(string str, Dictionary<int, MiddlePlace> mps)
     {
+        if (str == null)
+            return;
         foreach (string id_str in str.Split(','))
         {
             int id = int.Parse(id_str.Trim());

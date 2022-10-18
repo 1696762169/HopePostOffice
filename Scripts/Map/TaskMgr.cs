@@ -1,5 +1,6 @@
 //#define DEBUG_TASKMGR
 //#define DEBUG_MAP
+#define DEBUG_WAREHOUSE
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -15,56 +16,34 @@ public class TaskMgr
     // 任务配置表路径
     protected readonly string m_FilePath = Application.streamingAssetsPath + "/Tasks.xlsx";
 
+    // 当前/最大任务进度
+    public int Progress { get; protected set; }
+    public int MaxProgress { get; protected set; } = 3000;
+
     // 全部/当前任务池
-    protected List<Dictionary<int, TaskData>> m_AllTasks = new List<Dictionary<int, TaskData>>();
-    public List<TaskData> m_CurTasks = new List<TaskData>();
+    protected Dictionary<int, TaskData> m_AllTasks = new Dictionary<int, TaskData>();
+    protected List<TaskData> m_CurTasks = new List<TaskData>();
+    //当前场上未接取/已接取的任务 
+    protected Dictionary<BaseBlock, Task> m_WaitingTasks = new Dictionary<BaseBlock, Task>();
+    protected Dictionary<BasePostMan, Task> m_PickedTasks = new Dictionary<BasePostMan, Task>();
+
     // 中间地点池
-    protected Dictionary<int, MiddlePlace> allMiddlePlaces = new Dictionary<int, MiddlePlace>();
+    protected Dictionary<int, MiddlePlace> m_AllMiddlePlaces = new Dictionary<int, MiddlePlace>();
 
     // 正在产生的任务序号
     protected int m_CurTaskIndex;
     // 最大任务数
     protected const int m_MaxTaskNum = 5;
 
-    //当前未接取/已接取的任务 
-    protected Dictionary<BaseBlock,TaskData> CurWaitingTasks = new Dictionary<BaseBlock, TaskData>();
-    protected Dictionary<BasePostMan, TaskData> CurPickedTasks = new Dictionary<BasePostMan, TaskData>();
-
-    // 需要访问画布时自动获取场景上的画布对象
-    protected GameObject CanvasObj
-    {
-        get
-        {
-            if (m_canvas == null)
-            {
-                // 绑定画布对象与控件
-                m_canvas = GameObject.Find("任务画布");
-                PickButton = m_canvas.transform.GetChild(0).GetComponent<Button>();
-                CancelButton = m_canvas.transform.GetChild(1).GetComponent<Button>();
-                Discribtion = m_canvas.transform.GetChild(2).GetComponent<Text>();
-
-                // 初始化按钮功能
-                CancelButton.onClick.AddListener(() => Cancel());
-            }
-            return m_canvas;
-        }
-        set => m_canvas = value;
-    }
-    protected GameObject m_canvas;
-    // 画布控件
-    protected Button PickButton;
-    protected Button CancelButton;
-    protected Text Discribtion;
+    // 画布预制体
+    protected GameObject m_CanvasObj;
+    // 当前场景上的画布对象
+    protected List<GameObject> m_CanvasList = new List<GameObject>();
 
     // 任务图标资源
-    public GameObject TaskPick;
-    public GameObject TaskFinish;
-
-    // 用于清除场景上的图标所记录的对象
-    protected List<GameObject> TaskSigns = new List<GameObject>();
-    protected List<BaseBlock> Pickblocks = new List<BaseBlock>();
-    protected List<GameObject> TaskFinishes = new List<GameObject>();
-    protected List<BaseBlock> Finishblocks = new List<BaseBlock>();
+    protected GameObject m_StartObj;
+    protected GameObject m_MiddleObj;
+    protected GameObject m_EndObj;
 
     protected TaskMgr()
     {
@@ -72,27 +51,38 @@ public class TaskMgr
         foreach (MiddlePlaceRaw raw in MiniExcel.Query<MiddlePlaceRaw>(m_FilePath, sheetName: "MiddlePlace", startCell: "A3"))
         {
             if (raw.Name != null)
-                allMiddlePlaces.Add(raw.ID, new MiddlePlace(raw));
+                m_AllMiddlePlaces.Add(raw.ID, new MiddlePlace(raw));
         }
         // 读取任务数据
         foreach (TaskDataRaw raw in MiniExcel.Query<TaskDataRaw>(m_FilePath, sheetName: "Task", startCell: "A3"))
         {
             if (raw.StartName != null)
             {
-                TaskData data = new TaskData(raw, allMiddlePlaces);
-                while (data.AddDay > m_AllTasks.Count)
-                    m_AllTasks.Add(new Dictionary<int, TaskData>());
-                m_AllTasks[data.AddDay - 1].Add(raw.ID, data);
+                TaskData data = new TaskData(raw, m_AllMiddlePlaces);
+                m_AllTasks.Add(raw.ID, data);
             }
         }
-        // 加载预设体
-        const string prefabPath = "TaskPick";
-        TaskPick = Resources.Load<GameObject>(prefabPath);
-        TaskFinish = Resources.Load<GameObject>(prefabPath);
+        // 初始化前置任务数量
+        foreach (TaskData task in m_AllTasks.Values)
+        {
+            if (task.Next <= 0)
+                continue;
+            if (m_AllTasks.ContainsKey(task.Next))
+                ++m_AllTasks[task.Next].Prev;
+            else
+                Debug.LogError($"未找到ID为{task.Next}的后续任务");
+        }
 
-        // 添加任务事件
+        // 加载预设体
+        m_StartObj = Resources.Load<GameObject>("TaskPick");
+        m_MiddleObj = Resources.Load<GameObject>("TaskMiddle");
+        m_EndObj = Resources.Load<GameObject>("TaskEnd");
+        m_CanvasObj = Resources.Load<GameObject>("TaskCanvas");
+
+        // 添加事件
         TimeMgr.Instance.dayEndAction += AddTaskToQueue;
-        Cancel();
+        TimeMgr.Instance.dayEndAction += () => Progress = 0;
+
         // 添加第一天的任务
         AddTaskToQueue();
         for (int i = 0; i < m_MaxTaskNum; i++)
@@ -129,6 +119,11 @@ public class TaskMgr
         Debug.Log(table.Rows[0][19]);
         Debug.Log(table.Rows[19][19]);
 #endif
+#if DEBUG_WAREHOUSE
+        Warehouse.Instance.courage += 1000;
+        Warehouse.Instance.wisdom += 1000;
+        Warehouse.Instance.kindness += 1000;
+#endif
     }
 
     // 回合结束时产生任务 需加入回合结束事件（未完成）
@@ -138,7 +133,7 @@ public class TaskMgr
         int count = 0;
         int maxCount = m_CurTasks.Count * 3;
         // 任务太多 或 池子里没任务了 或 随机选择多次没有合适的任务 就别刷了
-        while (CurWaitingTasks.Count < m_MaxTaskNum && m_CurTasks.Count > 0 && count < maxCount)
+        while (m_WaitingTasks.Count < m_MaxTaskNum && m_CurTasks.Count > 0 && count < maxCount)
         {
             error = false;
             ++count;
@@ -146,9 +141,9 @@ public class TaskMgr
             m_CurTaskIndex = Random.Range(0, m_CurTasks.Count);
             // 该任务起点有任务起点 或 该任务起点有员工就换一个任务
             int start = m_CurTasks[m_CurTaskIndex].StartPoint;
-            foreach (TaskData task in CurWaitingTasks.Values)
+            foreach (Task task in m_WaitingTasks.Values)
             {
-                if (task.StartPoint == start)
+                if (task.data.StartPoint == start)
                 {
                     error = true;
                     break;
@@ -163,10 +158,10 @@ public class TaskMgr
     // 在场景中产生一个新任务
     protected void GenerateTaskOnScene()
     {
-        MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint].OnPostManGetin += ShowTaskCanvas;
-        MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint].OnPostManGetOut += Cancel;
-        CurWaitingTasks.Add(MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint], m_CurTasks[m_CurTaskIndex]);
-        ChangeTaskIcon(MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint]);
+        BaseBlock block = MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint];
+        m_WaitingTasks.Add(block, new Task(m_CurTasks[m_CurTaskIndex], block));
+        TaskProgress(m_WaitingTasks[block]);
+        block.OnPostManGetin += StartTask;
 
         // 从池子中移除刚生成的任务
         m_CurTasks.RemoveAt(m_CurTaskIndex);
@@ -179,127 +174,175 @@ public class TaskMgr
         // 某天之后没有任务了 就不需要加任务了
         if (day > m_AllTasks.Count)
             return;
-        foreach (TaskData task in m_AllTasks[day - 1].Values)
-            m_CurTasks.Add(task);
-    }
-
-    // 显示任务画布 当有人进入某地块时触发
-    protected void ShowTaskCanvas(BasePostMan postMan,BaseBlock block)
-    {
-        TaskData deta = new TaskData();
-        if (CurWaitingTasks.TryGetValue(block, out deta))
-        {   
-            CanvasObj.SetActive(true);
-            PickButton.onClick.RemoveAllListeners();
-            PickButton.onClick.AddListener(delegate { PickTask(block, deta, postMan); });
-
-            Discribtion.text = deta.StartDesc;
-
-            //TimeMgr.Instance.pause = true;
-        }
-    }
-
-    // 关闭任务画布
-    protected void Cancel(BasePostMan man= null,BaseBlock block=null)
-    {
-        CanvasObj.SetActive(false);
-    }
-
-    // 开始任务
-    protected void PickTask(BaseBlock Block,TaskData data,BasePostMan postMan)
-    {
-        Block.OnPostManGetin -= ShowTaskCanvas;
-        Block.OnPostManGetOut -= Cancel;
-
-        MapController.mapController.GameMap[data.EndPoint].OnPostManGetin += FinishTask;
-        ChangeTaskIcon(MapController.mapController.GameMap[data.EndPoint],false,true);
-
-        CurPickedTasks.Add(postMan, data);
-        CurWaitingTasks.Remove(Block);
-
-        postMan.GenerateBuffIcon(data.TaskIcon);
-
-        ChangeTaskIcon(MapController.mapController.GameMap[data.StartPoint],true,false);
-        Cancel();
-    }
-
-    // 完成任务
-    protected void FinishTask(BasePostMan postman, BaseBlock block)
-    {
-        if (CurPickedTasks.TryGetValue(postman, out TaskData task))
+        foreach (TaskData task in m_AllTasks.Values)
         {
-            if (MapController.mapController.GameMap[task.EndPoint] != block || !CheckAttr(postman))
-                return;
-            // 清除这个任务
-            ChangeTaskIcon(block,false,false);
-            postman.ClearBuffIcon(task.TaskIcon);
-            if (task.FinishTask != null)
-                task.FinishTask.Invoke();
-            CurPickedTasks.Remove(postman);
-
-            // 给予奖励
-            Warehouse.Instance.money += task.Reward;
-
-            Debug.LogWarning("任务奖励有待完善");
-
-            // 将后续任务加入任务池
-            for (int i = 0; i < m_AllTasks.Count; ++i)
-            {
-                if (m_AllTasks[i].ContainsKey(task.Next))
-                {
-                    m_CurTasks.Add(m_AllTasks[i][task.Next]);
-                    break;
-                }
-            }
-            // 产生新任务
-            GenerateTask();
+            if (task.AddDay <= day && task.Prev <= 0)
+                m_CurTasks.Add(task);
         }
     }
-    // 检查员工是否够资格完成任务
-    protected bool CheckAttr(BasePostMan postman)
-    {
-        if (!CurPickedTasks.ContainsKey(postman))
-            return false;
 
-        TaskData task = CurPickedTasks[postman];
-        EmployeeData postdData = postman.MyDeta;
-        return task.CourageNeed <= postdData.Courage &&
-                task.WisdomNeed <= postdData.Wisdom &&
-                task.KindnessNeed <= postdData.Kindness;
+    // 开始任务 当有人进入任务开始地块时触发
+    protected void StartTask(BasePostMan postman, BaseBlock block)
+    {
+        // 若进入者已经有任务则返回
+        if (m_PickedTasks.ContainsKey(postman))
+            return;
+        // 处理任务对象
+        Task task = m_WaitingTasks[block];
+        m_WaitingTasks[block].owner = postman;
+        TaskProgress(task);
+        // 添加玩家标识 和 地块事件
+        task.owner.GenerateBuffIcon(task.data.TaskIcon);
+        if (task.data.MiddleCount > 0)
+            task.block.OnPostManGetin += MiddleTask;
+        else
+            task.block.OnPostManGetin += EndTask;
+        // 更换任务容器
+        m_PickedTasks.Add(task.owner, task);
+        m_WaitingTasks.Remove(MapController.mapController.GameMap[task.data.StartPoint]);
+        // 清除拾取事件
+        block.OnPostManGetin -= StartTask;
+    }
+    // 路过中间点 当有人进入中间点地块时触发
+    protected void MiddleTask(BasePostMan postman, BaseBlock block)
+    {
+        // 确认来者身份
+        if (!m_PickedTasks.ContainsKey(postman) || m_PickedTasks[postman].block != block)
+            return;
+        // 处理任务对象 并 增删事件
+        Task task = m_PickedTasks[postman];
+        TaskProgress(task);
+        if (task.progress <= task.data.MiddleCount)
+            task.block.OnPostManGetin += MiddleTask;
+        else
+            task.block.OnPostManGetin += EndTask;
+        block.OnPostManGetin -= MiddleTask;
+    }
+    // 完成任务 当有人进入任务提交地块时触发
+    protected void EndTask(BasePostMan postman, BaseBlock block)
+    {
+        // 确认来者身份
+        if (!m_PickedTasks.ContainsKey(postman) || m_PickedTasks[postman].block != block)
+            return;
+        // 获取或创建一个画布对象
+        GameObject canvas = null;
+        foreach (GameObject obj in m_CanvasList)
+        {
+            if (!obj.activeInHierarchy)
+            {
+                canvas = obj;
+                canvas.SetActive(true);
+                break;
+            }
+        }
+        if (canvas == null)
+        {
+            canvas = GameObject.Instantiate(m_CanvasObj);
+            m_CanvasList.Add(canvas);
+        }
+        // 显示面板
+        canvas.GetComponent<TaskCanvas>().Show(m_PickedTasks[postman].data, () =>
+        {
+            ReallyEndTask(postman, block);
+            canvas.GetComponent<TaskCanvas>().Hide(postman, block);
+         });
+    }
+    // 真正完成任务 点击提交按钮后触发
+    protected void ReallyEndTask(BasePostMan postman, BaseBlock block)
+    {
+        if (!m_PickedTasks.ContainsKey(postman))
+            return;
+        Task task = m_PickedTasks[postman];
+        TaskData data = task.data;
+        if (MapController.mapController.GameMap[data.EndPoint] != block)
+            return;
+        if (!CheckAttr(data))
+            return;
+
+        // 清除这个任务 并 执行回调函数
+        TaskProgress(task);
+        m_PickedTasks.Remove(postman);
+        postman.ClearBuffIcon(data.TaskIcon);
+        if (data.FinishTask != null)
+            data.FinishTask.Invoke();
+
+        // 扣除点数 与 给予奖励
+        Warehouse.Instance.money += data.Reward;
+        Warehouse.Instance.courage -= data.CourageNeed;
+        Warehouse.Instance.wisdom -= data.WisdomNeed;
+        Warehouse.Instance.kindness -= data.KindnessNeed;
+        Progress += data.Progress;
+
+        // 将后续任务加入任务池
+        if (data.Next > 0)
+        {
+            --m_AllTasks[data.Next].Prev;
+            if (m_AllTasks[data.Next].Prev <= 0)
+                m_CurTasks.Add(m_AllTasks[data.Next]);
+        }
+        // 产生新任务
+        GenerateTask();
+        // 移除事件
+        block.OnPostManGetin -= EndTask;
+    }
+    // 检查资源是否够完成任务
+    protected bool CheckAttr(TaskData task)
+    {
+        return task.CourageNeed <= Warehouse.Instance.courage &&
+                task.WisdomNeed <= Warehouse.Instance.wisdom &&
+                task.KindnessNeed <= Warehouse.Instance.kindness;
     }
 
     // 更改任务起点和终点的图标
-    protected void ChangeTaskIcon(BaseBlock block,bool IsPicked=true, bool IsAdd = true)
+    protected void TaskProgress(Task task)
     {
-        if (IsAdd)
+        // 推进进度
+        ++task.progress;
+
+        // 更新任务地块
+        if (task.progress > 0)
         {
-            if (IsPicked)
-            {
-                GameObject go = GameObject.Instantiate(TaskPick, block.transform.position, Quaternion.identity);
-                TaskSigns.Add(go);
-                Pickblocks.Add(MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint]);
-            }
+            int point;
+            if (task.progress > task.data.MiddleCount)
+                point = task.data.EndPoint;
             else
-            {
-                GameObject go = GameObject.Instantiate(TaskFinish, block.transform.position, Quaternion.identity);
-                TaskFinishes.Add(go);
-                Finishblocks.Add(block);
-            }
+                point = task.data.GetMiddlePlace(task.progress - 1).Point;
+            task.block = MapController.mapController.GameMap[point];
         }
-        else
+
+        // 销毁原先的任务图标
+        if (task.obj != null)
         {
-            if (IsPicked) 
-            {
-                GameObject.Destroy(TaskSigns[Pickblocks.IndexOf(block)]);
-                TaskSigns.RemoveAt(Pickblocks.IndexOf(block));
-                Pickblocks.Remove(block);
-            }
+            GameObject.Destroy(task.obj);
+            task.obj = null;
+        }
+        // 新建任务图标
+        if (task.progress <= task.data.MiddleCount + 1)
+        {
+            GameObject prefab;
+            if (task.progress == 0)
+                prefab = m_StartObj;
+            else if (task.progress <= task.data.MiddleCount)
+                prefab = m_MiddleObj;
             else
-            {
-                GameObject.Destroy(TaskFinishes[Finishblocks.IndexOf(block)]);
-                TaskFinishes.RemoveAt(Finishblocks.IndexOf(block));
-                Finishblocks.Remove(block);
-            }
+                prefab = m_EndObj;
+            task.obj = GameObject.Instantiate(prefab, task.block.transform.position, Quaternion.identity);
+        }
+    }
+
+    // 管理场景上的任务对象和面板
+    protected class Task
+    {
+        public TaskData data;       // 任务数据
+        public GameObject obj;      // 当前场上的图标
+        public BaseBlock block;     // 图标所在地图区块
+        public BasePostMan owner;   // 接取该任务者
+        public int progress;        // 任务进度 -1表示任务未初始化 0表示任务未被接取
+        public Task(TaskData data, BaseBlock block)
+        {
+            this.data = data;
+            this.block = block;
+            progress = -1;
         }
     }
 
