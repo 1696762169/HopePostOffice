@@ -45,6 +45,9 @@ public class TaskMgr
     protected GameObject m_MiddleObj;
     protected GameObject m_EndObj;
 
+    // 调色板对象
+    protected TaskPalette m_Palette;
+
     protected TaskMgr()
     {
         // 读取中间地点数据
@@ -78,6 +81,7 @@ public class TaskMgr
         m_MiddleObj = Resources.Load<GameObject>("TaskMiddle");
         m_EndObj = Resources.Load<GameObject>("TaskEnd");
         m_CanvasObj = Resources.Load<GameObject>("TaskCanvas");
+        m_Palette = Resources.Load<GameObject>("TaskPalette").GetComponent<TaskPalette>();
 
         // 添加事件
         TimeMgr.Instance.dayEndAction += AddTaskToQueue;
@@ -158,8 +162,11 @@ public class TaskMgr
     // 在场景中产生一个新任务
     protected void GenerateTaskOnScene()
     {
+        //创建对象
         BaseBlock block = MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint];
-        m_WaitingTasks.Add(block, new Task(m_CurTasks[m_CurTaskIndex], block));
+        m_WaitingTasks.Add(block, new Task(m_CurTasks[m_CurTaskIndex], block, m_Palette.colors[m_Palette.count]));
+        m_Palette.count = (m_Palette.count + 1) % m_Palette.colors.Count;
+        // 进行初始化处理
         TaskProgress(m_WaitingTasks[block]);
         block.OnPostManGetin += StartTask;
 
@@ -327,6 +334,7 @@ public class TaskMgr
             else
                 prefab = m_EndObj;
             task.obj = GameObject.Instantiate(prefab, task.block.transform.position, Quaternion.identity);
+            task.obj.GetComponent<SpriteRenderer>().color = task.color;
         }
     }
 
@@ -337,11 +345,13 @@ public class TaskMgr
         public GameObject obj;      // 当前场上的图标
         public BaseBlock block;     // 图标所在地图区块
         public BasePostMan owner;   // 接取该任务者
+        public Color color;         // 任务图标颜色
         public int progress;        // 任务进度 -1表示任务未初始化 0表示任务未被接取
-        public Task(TaskData data, BaseBlock block)
+        public Task(TaskData data, BaseBlock block, Color color)
         {
             this.data = data;
             this.block = block;
+            this.color = color;
             progress = -1;
         }
     }
