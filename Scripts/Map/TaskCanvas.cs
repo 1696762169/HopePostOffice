@@ -32,17 +32,17 @@ public class TaskCanvas : MonoBehaviour
         m_Trans = transform.GetChild(0) as RectTransform;
     }
 
-    protected void Update()
-    {
-        m_TempPos = Camera.main.WorldToScreenPoint(m_Block.transform.position + DeltaPos);
-        m_Pos.x = m_TempPos.x;
-        m_Pos.y = m_TempPos.y;
-        m_Trans.anchoredPosition = m_Pos;
-#if DEBUG_TASKCANVAS
-        print(m_Block.transform.position);
-        print(m_TempPos);
-#endif
-    }
+//    protected void Update()
+//    {
+//        m_TempPos = Camera.main.WorldToScreenPoint(m_Block.transform.position + DeltaPos);
+//        m_Pos.x = m_TempPos.x;
+//        m_Pos.y = m_TempPos.y;
+//        m_Trans.anchoredPosition = m_Pos;
+//#if DEBUG_TASKCANVAS
+//        print(m_Block.transform.position);
+//        print(m_TempPos);
+//#endif
+//    }
 
     /// <summary>
     /// 显示面板
@@ -51,6 +51,7 @@ public class TaskCanvas : MonoBehaviour
     /// <param name="summit">提交后做的事</param>
     public void Show(TaskData task, UnityAction summit)
     {
+        Time.timeScale = 0;
         // 设置控件
         gameObject.SetActive(true);
         summitBtn.onClick.AddListener(summit);
@@ -67,6 +68,7 @@ public class TaskCanvas : MonoBehaviour
     // 隐藏面板 参数无用 为适应委托类型而设
     public void Hide(BasePostMan postman, BaseBlock block)
     {
+        Time.timeScale = 1;
         gameObject.SetActive(false);
         summitBtn.onClick.RemoveAllListeners();
         m_Block.OnPostManGetOut -= this.Hide;

@@ -21,15 +21,28 @@ public class TaskData
     public string EndDesc { get; protected set; }
     public int EndPoint { get; protected set; }
     // 后续任务ID
-    public int Next { get; protected set; }
+    public List<int> Next { get; protected set; }
     // 进度值
     public int Progress { get; protected set; }
-    // 信用点奖励
-    public int Reward { get; protected set; }
+
     // 信念点需求
     public int CourageNeed { get; protected set; }
     public int WisdomNeed { get; protected set; }
     public int KindnessNeed { get; protected set; }
+
+    // 信用点奖励
+    public int Reward { get; protected set; }
+    // 每天的信念点奖励
+    public int CourageReward { get; protected set; }
+    public int WisdomReward { get; protected set; }
+    public int KindnessReward { get; protected set; }
+
+    // 员工属性点加成
+    public int EmpSpeed { get; protected set; }
+    public int EmpCourage { get; protected set; }
+    public int EmpWisdom { get; protected set; }
+    public int EmpKindness { get; protected set; }
+
     // 加入天数
     public int AddDay { get; protected set; }
     // 任务使用图标
@@ -40,9 +53,9 @@ public class TaskData
     protected List<MiddlePlace> m_MiddlePlaces = new List<MiddlePlace>();
 
     // 任务完成触发事件
-    public UnityEvent FinishTask;
-    // 剩余前置任务数量
-    public int Prev;
+    public UnityEvent FinishTask = new UnityEvent();
+    // 是否为主线任务
+    public bool MainTask = true;
 
     public TaskData() { }
     public TaskData(TaskMgr.TaskDataRaw raw, Dictionary<int, MiddlePlace> mps)
@@ -54,12 +67,19 @@ public class TaskData
         EndName = raw.EndName;
         EndDesc = raw.EndDesc;
         EndPoint = StringToPosition(raw.EndPoint);
-        Next = raw.Next;
+        Next = StringToList(raw.Next);
         Progress = raw.Progress;
-        Reward = raw.Reward;
         CourageNeed = raw.CourageNeed;
         WisdomNeed = raw.WisdomNeed;
         KindnessNeed = raw.KindnessNeed;
+        Reward = raw.Reward;
+        CourageReward = raw.CourageReward;
+        WisdomReward = raw.WisdomReward;
+        KindnessReward = raw.KindnessReward;
+        EmpSpeed = raw.EmpSpeed;
+        EmpCourage = raw.EmpCourage;
+        EmpWisdom = raw.EmpWisdom;
+        EmpKindness = raw.EmpKindness;
         AddDay = raw.AddDay;
         GetSprite(m_SpritePath);
         AddMiddlePlaces(raw.MiddlePlace, mps);
@@ -84,6 +104,15 @@ public class TaskData
     {
         string[] vec = str.Split(',');
         return int.Parse(vec[0]) * 20 + int.Parse(vec[1]);
+    }
+    // 解析列表
+    protected static List<int> StringToList(string str)
+    {
+        List<int> list = new List<int>();
+        if (str != null)
+            foreach (string s in str.Split(','))
+                list.Add(int.Parse(s.Trim()));
+        return list;
     }
 
     // 获取任务图标资源
@@ -119,6 +148,9 @@ public class TaskData
             {
 
             });
+            break;
+        default:
+            FinishTask = null;
             break;
         }
     }

@@ -20,11 +20,12 @@ public class TaskMgr
     public int Progress { get; protected set; }
     public int MaxProgress { get; protected set; } = 3000;
 
-    // 全部/当前任务池
+    // 全部/当前/等待任务池
     protected Dictionary<int, TaskData> m_AllTasks = new Dictionary<int, TaskData>();
     protected List<TaskData> m_CurTasks = new List<TaskData>();
+    protected List<TaskData> m_WaitingTasks = new List<TaskData>();
     //当前场上未接取/已接取的任务 
-    protected Dictionary<BaseBlock, Task> m_WaitingTasks = new Dictionary<BaseBlock, Task>();
+    protected Dictionary<BaseBlock, Task> m_UnPickedTasks = new Dictionary<BaseBlock, Task>();
     protected Dictionary<BasePostMan, Task> m_PickedTasks = new Dictionary<BasePostMan, Task>();
 
     // 中间地点池
@@ -65,15 +66,16 @@ public class TaskMgr
                 m_AllTasks.Add(raw.ID, data);
             }
         }
-        // 初始化前置任务数量
+        // 判断主线任务
         foreach (TaskData task in m_AllTasks.Values)
         {
-            if (task.Next <= 0)
-                continue;
-            if (m_AllTasks.ContainsKey(task.Next))
-                ++m_AllTasks[task.Next].Prev;
-            else
-                Debug.LogError($"未找到ID为{task.Next}的后续任务");
+            foreach (int id in task.Next)
+            {
+                if (m_AllTasks.ContainsKey(id))
+                    m_AllTasks[id].MainTask = false;
+                else
+                    Debug.LogError($"未找到ID为{id}的后续任务");
+            }
         }
 
         // 加载预设体
@@ -84,8 +86,19 @@ public class TaskMgr
         m_Palette = Resources.Load<GameObject>("TaskPalette").GetComponent<TaskPalette>();
 
         // 添加事件
-        TimeMgr.Instance.dayEndAction += AddTaskToQueue;
-        TimeMgr.Instance.dayEndAction += () => Progress = 0;
+        TimeMgr.Instance.dayEndAction += () =>
+        {
+            AddTaskToQueue();
+            Progress = 0;
+            for (int i = m_WaitingTasks.Count - 1; i >= 0; --i)
+            {
+                if (m_WaitingTasks[i].AddDay <= TimeMgr.Instance.curDay)
+                {
+                    m_CurTasks.Add(m_WaitingTasks[i]);
+                    m_WaitingTasks.RemoveAt(i);
+                }
+            }
+        };
 
         // 添加第一天的任务
         AddTaskToQueue();
@@ -137,7 +150,7 @@ public class TaskMgr
         int count = 0;
         int maxCount = m_CurTasks.Count * 3;
         // 任务太多 或 池子里没任务了 或 随机选择多次没有合适的任务 就别刷了
-        while (m_WaitingTasks.Count < m_MaxTaskNum && m_CurTasks.Count > 0 && count < maxCount)
+        while (m_UnPickedTasks.Count < m_MaxTaskNum && m_CurTasks.Count > 0 && count < maxCount)
         {
             error = false;
             ++count;
@@ -145,7 +158,7 @@ public class TaskMgr
             m_CurTaskIndex = Random.Range(0, m_CurTasks.Count);
             // 该任务起点有任务起点 或 该任务起点有员工就换一个任务
             int start = m_CurTasks[m_CurTaskIndex].StartPoint;
-            foreach (Task task in m_WaitingTasks.Values)
+            foreach (Task task in m_UnPickedTasks.Values)
             {
                 if (task.data.StartPoint == start)
                 {
@@ -164,10 +177,10 @@ public class TaskMgr
     {
         //创建对象
         BaseBlock block = MapController.mapController.GameMap[m_CurTasks[m_CurTaskIndex].StartPoint];
-        m_WaitingTasks.Add(block, new Task(m_CurTasks[m_CurTaskIndex], block, m_Palette.colors[m_Palette.count]));
+        m_UnPickedTasks.Add(block, new Task(m_CurTasks[m_CurTaskIndex], block, m_Palette.colors[m_Palette.count]));
         m_Palette.count = (m_Palette.count + 1) % m_Palette.colors.Count;
         // 进行初始化处理
-        TaskProgress(m_WaitingTasks[block]);
+        TaskProgress(m_UnPickedTasks[block]);
         block.OnPostManGetin += StartTask;
 
         // 从池子中移除刚生成的任务
@@ -183,7 +196,7 @@ public class TaskMgr
             return;
         foreach (TaskData task in m_AllTasks.Values)
         {
-            if (task.AddDay <= day && task.Prev <= 0)
+            if (task.AddDay <= day && task.MainTask)
                 m_CurTasks.Add(task);
         }
     }
@@ -195,8 +208,8 @@ public class TaskMgr
         if (m_PickedTasks.ContainsKey(postman))
             return;
         // 处理任务对象
-        Task task = m_WaitingTasks[block];
-        m_WaitingTasks[block].owner = postman;
+        Task task = m_UnPickedTasks[block];
+        m_UnPickedTasks[block].owner = postman;
         TaskProgress(task);
         // 添加玩家标识 和 地块事件
         task.owner.GenerateBuffIcon(task.data.TaskIcon);
@@ -206,7 +219,7 @@ public class TaskMgr
             task.block.OnPostManGetin += EndTask;
         // 更换任务容器
         m_PickedTasks.Add(task.owner, task);
-        m_WaitingTasks.Remove(MapController.mapController.GameMap[task.data.StartPoint]);
+        m_UnPickedTasks.Remove(MapController.mapController.GameMap[task.data.StartPoint]);
         // 清除拾取事件
         block.OnPostManGetin -= StartTask;
     }
@@ -273,20 +286,32 @@ public class TaskMgr
         if (data.FinishTask != null)
             data.FinishTask.Invoke();
 
-        // 扣除点数 与 给予奖励
-        Warehouse.Instance.money += data.Reward;
+        // 扣除点数
         Warehouse.Instance.courage -= data.CourageNeed;
         Warehouse.Instance.wisdom -= data.WisdomNeed;
         Warehouse.Instance.kindness -= data.KindnessNeed;
+
+        // 给予奖励
+        Warehouse.Instance.money += data.Reward;
+        GlobalBuff.Instance.CourageEveryDay += data.CourageReward;
+        GlobalBuff.Instance.WisdomEveryDay += data.WisdomReward;
+        GlobalBuff.Instance.KindnessEveryDay += data.KindnessReward;
+
+        GlobalBuff.Instance.Speed += data.EmpSpeed;
+        GlobalBuff.Instance.Courage += data.EmpCourage;
+        GlobalBuff.Instance.Wisdom += data.EmpWisdom;
+        GlobalBuff.Instance.Kindness += data.EmpKindness;
         Progress += data.Progress;
 
         // 将后续任务加入任务池
-        if (data.Next > 0)
+        foreach (int id in data.Next)
         {
-            --m_AllTasks[data.Next].Prev;
-            if (m_AllTasks[data.Next].Prev <= 0)
-                m_CurTasks.Add(m_AllTasks[data.Next]);
+            if (m_AllTasks[id].AddDay <= TimeMgr.Instance.curDay)
+                m_CurTasks.Add(m_AllTasks[id]);
+            else
+                m_WaitingTasks.Add(m_AllTasks[id]);
         }
+
         // 产生新任务
         GenerateTask();
         // 移除事件
@@ -369,15 +394,28 @@ public class TaskMgr
         public string EndDesc { get; set; }
         public string EndPoint { get; set; }
         // 后续任务ID
-        public int Next { get; set; }
+        public string Next { get; set; }
         // 进度值
         public int Progress { get; set; }
-        // 信用点奖励
-        public int Reward { get; set; }
+
         // 信念点需求
         public int CourageNeed { get; set; }
         public int WisdomNeed { get; set; }
         public int KindnessNeed { get; set; }
+
+        // 信用点奖励
+        public int Reward { get; set; }
+        // 每天的信念点奖励
+        public int CourageReward { get; set; }
+        public int WisdomReward { get; set; }
+        public int KindnessReward { get; set; }
+
+        // 员工属性点加成
+        public int EmpSpeed { get; set; }
+        public int EmpCourage { get; set; }
+        public int EmpWisdom { get; set; }
+        public int EmpKindness { get; set; }
+
         // 加入天数
         public int AddDay { get; set; }
         // 中间地点
