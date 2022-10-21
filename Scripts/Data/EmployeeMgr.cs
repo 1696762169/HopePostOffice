@@ -57,9 +57,10 @@ public class EmployeeMgr
         public int Wisdom { get; set; }
         public int Kindness { get; set; }
         public int Price { get; set; }
+        public string UpgradePrice { get; set; }
     }
     private EmployeeData CreateEmployeeData(int id, EmpDataRaw raw)
     {
-        return new EmployeeData(id, raw.Name, raw.Speed, raw.Courage, raw.Wisdom, raw.Kindness, raw.Price);
+        return new EmployeeData(id, raw.Name, raw.Speed, raw.Courage, raw.Wisdom, raw.Kindness, raw.Price, raw.UpgradePrice);
     }
 }

@@ -32,6 +32,9 @@ public class EmployeeData
     public int Price => price;
     [SerializeField]
     private int price;
+    public List<int> UpgradePrice => upgradePrice;
+    [SerializeField]
+    private List<int> upgradePrice = new List<int>();
 
     // 基础等级
     public const int attrNum = 3;
@@ -43,7 +46,7 @@ public class EmployeeData
     private List<ItemData> itemList = new List<ItemData>();
 
     // 构造函数
-    public EmployeeData(int id, string name, int speed, int courage, int wisdom, int kindness, int price)
+    public EmployeeData(int id, string name, int speed, int courage, int wisdom, int kindness, int price, string up)
     {
         this.id = id;
         this.name = name;
@@ -52,6 +55,10 @@ public class EmployeeData
         attrLevel[1] = wisdom;
         attrLevel[2] = kindness;
         this.price = price;
+        foreach (string str in up.Split(','))
+            upgradePrice.Add(int.Parse(str.Trim()));
+        if (upgradePrice.Count != 12)
+            Debug.LogError($"{id}号员工的升级花费列表(UpgradePrice)元素数量不是12个");
     }
 
     // 添加与减少道具
